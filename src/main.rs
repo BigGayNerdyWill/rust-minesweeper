@@ -12,6 +12,7 @@ const HEIGHT:usize = 64;
 const LENGTH:usize = 240;
 const IBORDR:u16 = 1;
 const JBORDR:u16 = 2;
+const BOT:bool = true;
 
 fn genBoard(spawn:(usize,usize),brd:&mut [[u8;LENGTH];HEIGHT]){
     let (sx, sy) = spawn;
@@ -94,9 +95,9 @@ fn draw(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board
     stdout.flush().unwrap();
 }
 
-fn loose(flags:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT])->bool{ 
+fn gameOver(flags:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT],s:&str)->bool{ 
     draw(flags,known,board,(HEIGHT+3,0),true);
-    println!("\ryou have lost.\n\rpress space to retry, and press q to quit\r");
+    println!("\r{}\n\rpress space to retry, and press q to quit\r",s);
     let stdin = io::stdin();
     for c in stdin.keys(){
         match c.unwrap(){
@@ -108,7 +109,6 @@ fn loose(flags:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],boa
     return false;
 }
 
-const BOT:bool=true;
 
 fn click(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT],fTurn:&mut bool, cords:(usize,usize)) -> bool{
     if *fTurn{genBoard(cords, board);*fTurn=false;}
@@ -118,19 +118,25 @@ fn click(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],boar
     false
 }
 
-fn placeFlag(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT], i:usize,j:usize){ 
+fn placeFlag(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT], i:usize,j:usize,corr:&mut u16)->bool{ 
     flgs[i][j] = !flgs[i][j];
     known[i][j] = !known[i][j];
+    if board[i][j]==9{if flgs[i][j]{*corr+=1;}else{*corr-=1;}}
     let mut c = ' ';
     if flgs[i][j]{c='F';}
     let mut s = String::new();
     if BOT{s = format!("{}",termion::cursor::Goto(j as u16 +JBORDR+1,i as u16 +IBORDR+1));}
     write!(io::stdout(),"{}{}{}{}{}",s,color::Fg(color::AnsiValue::rgb(5,0,0)),c,color::Fg(color::Reset),termion::cursor::Left(1));
+    if *corr>=MINEES{return gameOver(flgs,known,board,"you have won!");}
+    false
 }
 
 fn main() {
+    let mut correct=0;
     let mut playing = true;
     while playing{
+        correct=0;
+        playing = false;
         let mut fTurn=true;
         let mut flgs = [[false;LENGTH];HEIGHT];
         let mut known = [[false;LENGTH];HEIGHT];
@@ -141,15 +147,18 @@ fn main() {
             let mut c = 0;
             for i in 0..HEIGHT{
                 for j in 0..LENGTH{
-                    if board[i][j] == 9{placeFlag(&mut flgs,&mut known,&mut board,i,j)}
+                    if board[i][j] == 9{playing = placeFlag(&mut flgs,&mut known,&mut board,i,j,&mut correct)}
                     else{click(&mut flgs,&mut known,&mut board,&mut fTurn,(i,j));}
                     c+=1;
                     if c>100{c=0;
                         draw(&mut flgs,&mut known,&mut board,(i,j),false);
                     }
+                    if playing{break;}
                 }
+                if playing{break;}
             }
         }
+        if playing{continue;}
         let stdin = io::stdin();
         for c in stdin.keys(){
             match c.unwrap(){
@@ -157,7 +166,7 @@ fn main() {
                     let (j,i) = stdout.cursor_pos().unwrap();
                     let (i,j) = ((i-1-IBORDR) as usize,(j-1-JBORDR) as usize);
                     if click(&mut flgs,&mut known,&mut board,&mut fTurn, (i,j)){
-                        playing =  loose(&mut flgs,&mut known,&mut board); //if this returns true, restart game
+                        playing =  gameOver(&mut flgs,&mut known,&mut board,"you have lost."); //if this returns true, restart game
                         break;}
                 },
                 Key::Char('q') => {write!(stdout,"{}{}",termion::clear::All,termion::cursor::Goto(1,1));playing=false;break;}, //quits game
@@ -167,11 +176,7 @@ fn main() {
                         let (i,j) = ((i-1-IBORDR) as usize,(j-1-JBORDR) as usize);
                         let mut c:char;
                         if (i < HEIGHT && j < LENGTH){
-                            flgs[i][j] = !flgs[i][j];
-                            known[i][j] = !known[i][j];
-                            if flgs[i][j]{c='F';
-                            }else{c=' ';}
-                            write!(stdout,"{}{}{}{}",color::Fg(color::AnsiValue::rgb(5,0,0)),c,color::Fg(color::Reset),termion::cursor::Left(1));
+                            playing = placeFlag(&mut flgs,&mut known, &mut board,i,j,&mut correct);
                         }
                     }
                 },
@@ -181,6 +186,7 @@ fn main() {
                 Key::Left => {write!(stdout,"{}",termion::cursor::Left(1));}
                 _ => continue,
             }
+            if playing{break;}
             stdout.flush().unwrap();
         }
     }
