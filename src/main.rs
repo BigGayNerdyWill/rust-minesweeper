@@ -7,15 +7,18 @@ use termion::cursor::DetectCursorPos;
 use rand::Rng;
 use termion::color;
 
+const MINEES:u16 = 99;
 const HEIGHT:usize = 16;
 const LENGTH:usize = 30;
+const IBORDR:u16 = 1;
+const JBORDR:u16 = 2;
 
 fn genBoard(spawn:(usize,usize),brd:&mut [[u8;LENGTH];HEIGHT]){
     let (sx, sy) = spawn;
     let (sx,sy) = (sx as isize,sy as isize);
     let mut rng = rand::thread_rng();
     let mut count = 0;
-    while count < 99 {
+    while count < MINEES {
         let (i,j) = (rng.gen_range(0..HEIGHT),rng.gen_range(0..LENGTH));
         let mut notspawn = false;
         let (di,dj) = ((i as isize -sx), (j as isize - sy));
@@ -60,6 +63,10 @@ fn revealTile(board:&mut [[u8;LENGTH];HEIGHT], known:&mut [[bool;LENGTH];HEIGHT]
 fn draw(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT],coords:(usize,usize),lost:bool){
     let mut s = String::new();
     let mut stdout = io::stdout().into_raw_mode().unwrap();
+    
+    s.push_str("██");
+    for j in 0..LENGTH{s.push('█');}
+    s.push_str("██\n\r██");
     for i in 0..HEIGHT{
         for j in 0..LENGTH{
             if flgs[i][j] && !lost{
@@ -76,20 +83,20 @@ fn draw(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board
                 }
             }else{s.push(' ');}
         }
-        s.push_str("██\n\r");
+        s.push_str("██\n\r██");
     }
     for j in 0..LENGTH{s.push('█');}
     s.push_str("██\n\r");
     let (i,j) = coords;
 
 
-    write!(stdout,"{}{}{}{}",termion::clear::All,termion::cursor::Goto(1,1),s,termion::cursor::Goto((j+1) as u16,(i+1) as u16)).unwrap();
+    write!(stdout,"{}{}{}{}",termion::clear::All,termion::cursor::Goto(1,1),s,termion::cursor::Goto((j+1) as u16+JBORDR,(i+1) as u16 + IBORDR)).unwrap();
     stdout.flush().unwrap();
 }
 
 fn loose(flags:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT])->bool{ 
-    draw(flags,known,board,(HEIGHT+4,0),true);
-    println!("you have lost.\n\rpress space to retry, and press q to quit\r");
+    draw(flags,known,board,(HEIGHT+3,0),true);
+    println!("\ryou have lost.\n\rpress space to retry, and press q to quit\r");
     let stdin = io::stdin();
     for c in stdin.keys(){
         match c.unwrap(){
@@ -102,6 +109,8 @@ fn loose(flags:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],boa
 }
 
 fn main() {
+
+
     let mut playing = true;
     while playing{
         let mut fTurn = true;
@@ -115,7 +124,7 @@ fn main() {
             match c.unwrap(){
                 Key::Char(' ') => { //opens tile up
                     let (j,i) = stdout.cursor_pos().unwrap();
-                    let (i,j) = ((i-1) as usize,(j-1) as usize);
+                    let (i,j) = ((i-1-IBORDR) as usize,(j-1-JBORDR) as usize);
                     if fTurn{genBoard((i,j), &mut board);fTurn=false;}
                     if board[i][j]==9{
                         playing =  loose(&mut flgs,&mut known,&mut board); //if this returns true, restart game
@@ -126,13 +135,15 @@ fn main() {
                 Key::Char('q') => {write!(stdout,"{}{}",termion::clear::All,termion::cursor::Goto(1,1));playing=false;break;}, //quits game
                 Key::Char('f') => { //flag a bomb, allows for unflagging the same way
                     let (j,i) = stdout.cursor_pos().unwrap();
-                    let (i,j) = ((i-1) as usize,(j-1) as usize);
-                    let mut c:char;
-                    if (i < HEIGHT && j < LENGTH){
-                        flgs[i][j] = !flgs[i][j];
-                        if flgs[i][j]{c='F';
-                        }else{c=' ';}
-                        write!(stdout,"{}{}{}{}",color::Fg(color::AnsiValue::rgb(5,0,0)),c,color::Fg(color::Reset),termion::cursor::Left(1));
+                    if (i > IBORDR && j> JBORDR){
+                        let (i,j) = ((i-1-IBORDR) as usize,(j-1-JBORDR) as usize);
+                        let mut c:char;
+                        if (i < HEIGHT && j < LENGTH){
+                            flgs[i][j] = !flgs[i][j];
+                            if flgs[i][j]{c='F';
+                            }else{c=' ';}
+                            write!(stdout,"{}{}{}{}",color::Fg(color::AnsiValue::rgb(5,0,0)),c,color::Fg(color::Reset),termion::cursor::Left(1));
+                        }
                     }
                 },
                 Key::Up => {write!(stdout,"{}",termion::cursor::Up(1));}
