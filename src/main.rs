@@ -7,9 +7,9 @@ use termion::cursor::DetectCursorPos;
 use rand::Rng;
 use termion::color;
 
-const MINEES:u16 = 99;
-const HEIGHT:usize = 16;
-const LENGTH:usize = 30;
+const MINEES:u16 = 3200;
+const HEIGHT:usize = 64;
+const LENGTH:usize = 240;
 const IBORDR:u16 = 1;
 const JBORDR:u16 = 2;
 
@@ -108,29 +108,57 @@ fn loose(flags:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],boa
     return false;
 }
 
+const BOT:bool=true;
+
+fn click(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT],fTurn:&mut bool, cords:(usize,usize)) -> bool{
+    if *fTurn{genBoard(cords, board);*fTurn=false;}
+    if board[cords.0][cords.1]==9{return true;}
+    else{revealTile(board,known,cords.0,cords.1);}
+    if !BOT {draw(flgs,known,board,cords,false);}
+    false
+}
+
+fn placeFlag(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT], i:usize,j:usize){ 
+    flgs[i][j] = !flgs[i][j];
+    known[i][j] = !known[i][j];
+    let mut c = ' ';
+    if flgs[i][j]{c='F';}
+    let mut s = String::new();
+    if BOT{s = format!("{}",termion::cursor::Goto(j as u16 +JBORDR+1,i as u16 +IBORDR+1));}
+    write!(io::stdout(),"{}{}{}{}{}",s,color::Fg(color::AnsiValue::rgb(5,0,0)),c,color::Fg(color::Reset),termion::cursor::Left(1));
+}
+
 fn main() {
-
-
     let mut playing = true;
     while playing{
-        let mut fTurn = true;
+        let mut fTurn=true;
         let mut flgs = [[false;LENGTH];HEIGHT];
         let mut known = [[false;LENGTH];HEIGHT];
         let mut board = [[0;LENGTH];HEIGHT];
         let mut stdout = io::stdout().into_raw_mode().unwrap();
         draw(&mut flgs,&mut known,&mut board,(0,0),false);
+        if BOT{
+            let mut c = 0;
+            for i in 0..HEIGHT{
+                for j in 0..LENGTH{
+                    if board[i][j] == 9{placeFlag(&mut flgs,&mut known,&mut board,i,j)}
+                    else{click(&mut flgs,&mut known,&mut board,&mut fTurn,(i,j));}
+                    c+=1;
+                    if c>100{c=0;
+                        draw(&mut flgs,&mut known,&mut board,(i,j),false);
+                    }
+                }
+            }
+        }
         let stdin = io::stdin();
         for c in stdin.keys(){
             match c.unwrap(){
                 Key::Char(' ') => { //opens tile up
                     let (j,i) = stdout.cursor_pos().unwrap();
                     let (i,j) = ((i-1-IBORDR) as usize,(j-1-JBORDR) as usize);
-                    if fTurn{genBoard((i,j), &mut board);fTurn=false;}
-                    if board[i][j]==9{
+                    if click(&mut flgs,&mut known,&mut board,&mut fTurn, (i,j)){
                         playing =  loose(&mut flgs,&mut known,&mut board); //if this returns true, restart game
                         break;}
-                    else{revealTile(&mut board,&mut known,i,j);}
-                    draw(&mut flgs,&mut known,&mut board,(i,j),false);
                 },
                 Key::Char('q') => {write!(stdout,"{}{}",termion::clear::All,termion::cursor::Goto(1,1));playing=false;break;}, //quits game
                 Key::Char('f') => { //flag a bomb, allows for unflagging the same way
@@ -140,6 +168,7 @@ fn main() {
                         let mut c:char;
                         if (i < HEIGHT && j < LENGTH){
                             flgs[i][j] = !flgs[i][j];
+                            known[i][j] = !known[i][j];
                             if flgs[i][j]{c='F';
                             }else{c=' ';}
                             write!(stdout,"{}{}{}{}",color::Fg(color::AnsiValue::rgb(5,0,0)),c,color::Fg(color::Reset),termion::cursor::Left(1));
