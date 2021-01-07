@@ -7,12 +7,12 @@ use termion::cursor::DetectCursorPos;
 use rand::Rng;
 use termion::color;
 
-const MINEES:u16 = 3200;
-const HEIGHT:usize = 64;
-const LENGTH:usize = 240;
+const MINEES:u16 = 99;
+const HEIGHT:usize = 16;
+const LENGTH:usize = 30;
 const IBORDR:u16 = 1;
 const JBORDR:u16 = 2;
-const BOT:bool = true;
+const BOT:bool = false;
 
 fn genBoard(spawn:(usize,usize),brd:&mut [[u8;LENGTH];HEIGHT]){
     let (sx, sy) = spawn;
