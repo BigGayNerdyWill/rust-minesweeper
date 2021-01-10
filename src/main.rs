@@ -11,10 +11,10 @@ use std::thread;
 
 const MINEES:u16 = 99;
 const HEIGHT:usize = 16;
-const LENGTH:usize = 30;
+const LENGTH:usize = 32;
 const IBORDR:u16 = 1;
 const JBORDR:u16 = 2;
-const BOT:bool = false;
+const BOT:bool = true;
 
 fn genBoard(spawn:(usize,usize),brd:&mut [[u8;LENGTH];HEIGHT]){
     let (sx, sy) = spawn;
@@ -213,127 +213,136 @@ fn runBot(){
     let (tx,rx):(mpsc::Sender<bool>,mpsc::Receiver<bool>) = mpsc::channel();
     let t =thread::spawn(move ||{
         while playing{
-        correct=0;
-        playing = false;
-        let mut fTurn=true;
-        let mut flgs = [[false;LENGTH];HEIGHT];
-        let mut known = [[false;LENGTH];HEIGHT];
-        let mut board = [[0;LENGTH];HEIGHT];
-        let mut stdout = io::stdout().into_raw_mode().unwrap();
-        draw(&mut flgs,&mut known,&mut board,(0,0),false);
-        let mut spaces = [[8;LENGTH];HEIGHT];
-        click(&mut flgs,&mut known,&mut board,&mut fTurn,(HEIGHT/2,LENGTH/2));
-        filledSpace(&mut spaces,HEIGHT/2,LENGTH/2);
-        let mut lchang=true;
-        let mut chang=false;
-        while !playing{
-            for i in 0..HEIGHT{
-                for j in 0..LENGTH{
-                    if known[i][j] && board[i][j]<9{
-                        let (ivals,jvals) = area(i,j);
-                        let mut tiles:Vec<(usize,usize)> = Vec::new();
-                        for ii in ivals.iter(){
-                            for jj in jvals.iter(){
-                                if((*ii == 1 && *jj == 1) || known[i+ii-1][j+jj-1]){continue;}
-                                if board[i][j]==0{
-                                    chang=true;
-                                    playing = click(&mut flgs,&mut known,&mut board,&mut fTurn,(i+ii-1,j+jj-1));
-                                    filledSpace(&mut spaces,i+ii-1,j+jj-1);
-                                }else if board[i][j]==spaces[i][j]{
-                                    chang=true;
-                                    playing = placeFlag(&mut flgs,&mut known, &mut board,i+ii-1,j+jj-1,&mut correct);
-                                    bombFound(&mut spaces,&mut board,i+ii-1,j+jj-1);
-                                }else{
-                                    tiles.push((*ii,*jj));
-                                }
-                            }
-                        }
-                        if !lchang && spaces[i][j]>0{
-                            let mut failed = false;
-                            let mut doubleW = false;
-                            let mut wrong=false;
-                            let outs = ptrn(Vec::new(),board[i][j] as usize,&mut tiles);
-                            let m = square5(i,j);
-                            let mut mb = [[0;5];5];
-                            let winO:Vec<(usize,usize)>=Vec::new();
-                            for o in outs{
-                                //o is a vector of tiles, that should be tested to see if mines fit
-                                for t in m.iter(){
-                                    mb[t.0][t.1] = board[t.0+i-2][t.1+j-2] as i8;
-                                }
-                                for posFlag in o.iter(){
-                                   let (ivals,jvals) = area(i+posFlag.0-1,j+posFlag.1-1);
-                                   for ii in ivals.iter(){
-                                        for jj in jvals.iter(){
-                                            mb[posFlag.0+ii][posFlag.1+jj]-=1;
-                                        }
-                                   }
-                                }
-                                wrong = false;
-                                for ii in 0..5{
-                                    for jj in 0..5{
-                                        if mb[ii][jj] < 0{
-                                            wrong=true;
-                                            break;
-                                        }
-                                    }
-                                    if wrong{break;}
-                                }
-                                if !wrong&&doubleW{failed=true;break;}
-                                if !wrong{let winO = o;doubleW=true;}
-                            }
-                            if doubleW&&!failed{
-                                for posFlag in winO{
-                                    chang=true;
-                                    playing = placeFlag(&mut flgs,&mut known,&mut board,i+posFlag.0-1,j+posFlag.1-1,&mut correct);
-                                    bombFound(&mut spaces,&mut board,i+posFlag.0-1,j+posFlag.1-1);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            chang=false;
-            lchang=false;
-            if !(chang||lchang){
-                //highest lowest p and then click it
-                //the others are gaurenteed to win, this isnt
-                //thread::sleep_ms(1000);
+            let mut failRow=0.0;
+            correct=0;
+            playing = false;
+            let mut fTurn=true;
+            let mut flgs = [[false;LENGTH];HEIGHT];
+            let mut known = [[false;LENGTH];HEIGHT];
+            let mut board = [[0;LENGTH];HEIGHT];
+            let mut stdout = io::stdout().into_raw_mode().unwrap();
+            draw(&mut flgs,&mut known,&mut board,(0,0),false);
+            let mut spaces = [[8;LENGTH];HEIGHT];
+            click(&mut flgs,&mut known,&mut board,&mut fTurn,(HEIGHT/2,LENGTH/2));
+            filledSpace(&mut spaces,HEIGHT/2,LENGTH/2);
+            let mut lchang=true;
+            let mut chang=false;
+            while !playing{
                 for i in 0..HEIGHT{
                     for j in 0..LENGTH{
-                        if known[i][j]{
-                            let (ivec,jvec) = area(i,j);
-                            for ii in ivec.iter(){
-                                for jj in jvec.iter(){
-                                    let p = (i+ii-1,j+jj-1); 
-                                    if !known[p.0][p.1]{
-                                        if board[p.0][p.1]==9{
+                        if known[i][j] && board[i][j]<9{
+                            let (ivals,jvals) = area(i,j);
+                            let mut tiles:Vec<(usize,usize)> = Vec::new();
+                            for ii in ivals.iter(){
+                                for jj in jvals.iter(){
+                                    if((*ii == 1 && *jj == 1) || known[i+ii-1][j+jj-1]){continue;}
+                                    if board[i][j]==0{
+                                        chang=true;
+                                        playing = click(&mut flgs,&mut known,&mut board,&mut fTurn,(i+ii-1,j+jj-1));
+                                        filledSpace(&mut spaces,i+ii-1,j+jj-1);
+                                    }else if board[i][j]==spaces[i][j]{
+                                        chang=true;
+                                        playing = placeFlag(&mut flgs,&mut known, &mut board,i+ii-1,j+jj-1,&mut correct);
+                                        bombFound(&mut spaces,&mut board,i+ii-1,j+jj-1);
+                                    }else{
+                                        tiles.push((*ii,*jj));
+                                    }
+                                }
+                            }
+                            if !lchang && spaces[i][j]>0{
+                                let mut wrong;
+                                let mut outs = ptrn(Vec::new(),board[i][j] as usize,&mut tiles);
+                                let m = square5(i,j);
+                                let mut mb = [[0;5];5];
+                                let mut corrPats:Vec<(usize,usize)>=Vec::new();
+                                for o in outs.iter_mut(){
+                                    //o is a vector of tiles, that should be tested to see if mines fit
+                                    for t in m.iter(){
+                                        mb[t.0][t.1] = board[t.0+i-2][t.1+j-2] as i8;
+                                    }
+                                    for posFlag in o.iter(){
+                                       let (ivals,jvals) = area(i+posFlag.0-1,j+posFlag.1-1);
+                                       for ii in ivals.iter(){
+                                            for jj in jvals.iter(){
+                                                mb[posFlag.0+ii][posFlag.1+jj]-=1;
+                                            }
+                                       }
+                                    }
+                                    wrong = false;
+                                    for ii in 0..5{
+                                        for jj in 0..5{
+                                            if mb[ii][jj] < 0{
+                                                wrong=true;
+                                                break;
+                                            }
+                                        }
+                                        if wrong{break;}
+                                    }
+                                    if !wrong{corrPats.append(o);}
+                                }
+                                let mut tprob:[[f32;3];3] = [[0.0;3];3];
+                                let l = corrPats.len() as f32;
+                                for pat in corrPats.iter(){
+                                    tprob[pat.0][pat.1]+=1.0;
+                                }
+                                for ii in 0..3{
+                                    for jj in 0..3{
+                                        tprob[ii][jj] /= l;
+                                        if tprob[ii][jj] >=1.0- failRow{
                                             chang=true;
-                                            playing = placeFlag(&mut flgs,&mut known, &mut board,p.0,p.1,&mut correct);
-                                            bombFound(&mut spaces,&mut board,p.0,p.1);
-                                        }else{
-                                            chang=true;
-                                            playing = click(&mut flgs,&mut known,&mut board,&mut fTurn,p);
-                                            filledSpace(&mut spaces,p.0,p.1);
+                                            playing = placeFlag(&mut flgs,&mut known,&mut board,i+ii-1,j+jj-1,&mut correct);
+                                            bombFound(&mut spaces,&mut board,i+ii-1,j+jj-1);
                                         }
                                     }
                                 }
                             }
                         }
-                        if chang{break;}
                     }
-                    if chang{break;}
+                }
+                if !(chang||lchang){
+                    failRow+=0.1;
+                    if failRow>0.2{
+                        //highest lowest p and then click it
+                        //the others are gaurenteed to win, this isnt
+                        //thread::sleep_ms(1000);
+                        for i in 0..HEIGHT{
+                            for j in 0..LENGTH{
+                                if known[i][j]{
+                                    let (ivec,jvec) = area(i,j);
+                                    for ii in ivec.iter(){
+                                        for jj in jvec.iter(){
+                                            let p = (i+ii-1,j+jj-1); 
+                                            if !known[p.0][p.1]{
+                                                if board[p.0][p.1]==9{
+                                                    chang=true;
+                                                    playing = placeFlag(&mut flgs,&mut known, &mut board,p.0,p.1,&mut correct);
+                                                    bombFound(&mut spaces,&mut board,p.0,p.1);
+                                                }else{
+                                                    chang=true;
+                                                    playing = click(&mut flgs,&mut known,&mut board,&mut fTurn,p);
+                                                    filledSpace(&mut spaces,p.0,p.1);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if chang{break;}
+                            }
+                            if chang{break;}
+                        }
+                        failRow=0.0;
+                    }
+                }
+                else{failRow=0.0;}
+                lchang = chang;
+                chang=false;
+                draw(&mut flgs,&mut known,&mut board,(0,0),false);
+                //thread::sleep_ms(100);
+                match rx.try_recv(){
+                    Ok(_) => break,
+                    Err(_) => continue,
                 }
             }
-            lchang = chang;
-            chang=false;
-            draw(&mut flgs,&mut known,&mut board,(0,0),false);
-            //thread::sleep_ms(100);
-            match rx.try_recv(){
-                Ok(_) => break,
-                Err(_) => continue,
-            }
-        }
         }
     });
     let stdin = io::stdin();
