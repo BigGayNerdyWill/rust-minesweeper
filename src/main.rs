@@ -122,8 +122,8 @@ fn click(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],boar
 
 fn placeFlag(flgs:&mut [[bool;LENGTH];HEIGHT],known:&mut [[bool;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT], i:usize,j:usize,corr:&mut u16)->bool{ 
     let stdin = io::stdin();
-    if board[i][j]!=9{
-        panic!("not a bomb");}
+    //if board[i][j]!=9{
+    //    panic!("not a bomb");}
     flgs[i][j] = !flgs[i][j];
     known[i][j] = !known[i][j];
     if board[i][j]==9{if flgs[i][j]{*corr+=1;}else{*corr-=1;}}
@@ -148,8 +148,8 @@ fn filledSpace(space:&mut [[u8;LENGTH];HEIGHT],i:usize,j:usize){
 fn bombFound(spaces:&mut [[u8;LENGTH];HEIGHT],board:&mut [[u8;LENGTH];HEIGHT],i:usize,j:usize){
     let (ivals,jvals) = area(i,j);
     let stdin = io::stdin();
-    if board[i][j]!=9{
-        panic!("not a bomb");}
+    //if board[i][j]!=9{
+    //    panic!("not a bomb");}
     for ii in ivals.iter(){
         for jj in jvals.iter(){
             if board[i+ii-1][j+jj-1]>0 && 9>board[i+ii-1][j+jj-1] && (1!=*jj || *ii!=1)
